@@ -1,0 +1,46 @@
+{
+  "name": "pixel-quest-landing",
+  "version": "1.0.0",
+  "description": "Responsive pixel art landing page for Pixel Quest game with forest green color palette",
+  "main": "index.html",
+  "scripts": {
+    "start": "serve -s . -l 3000",
+    "dev": "live-server --port=3000",
+    "build": "echo 'Build complete - ready for deployment'",
+    "test": "echo 'No tests yet - add Jest for testing'",
+    "lint": "echo 'Add ESLint for code quality checks'"
+  },
+  "keywords": [
+    "pixel-art",
+    "game",
+    "landing-page",
+    "responsive",
+    "react",
+    "earthy-colors",
+    "animation"
+  ],
+  "author": "Pixel Quest Development Team",
+  "license": "MIT",
+  "devDependencies": {
+    "serve": "^14.2.0",
+    "live-server": "^1.2.2"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead",
+    "not ie 11"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/pixel-quest-landing.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/pixel-quest-landing/issues"
+  },
+  "homepage": "https://yourusername.github.io/pixel-quest-landing"
+}

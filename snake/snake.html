@@ -1,0 +1,676 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Forest Snake</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load React and ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Load Babel for JSX/TS transpilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      body {
+        overscroll-behavior: none;
+        touch-action: none;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-900 text-white antialiased">
+    <div id="root"></div>
+
+    <script type="text/babel">
+      // All application code is now in this script tag.
+      // Babel will transpile and run it.
+
+      // --- from types.ts ---
+      const Direction = {
+        UP: 0,
+        DOWN: 1,
+        LEFT: 2,
+        RIGHT: 3,
+      };
+
+      const EggType = {
+        GREEN: 'GREEN',
+        RED: 'RED',
+        BLUE: 'BLUE',
+        PURPLE: 'PURPLE',
+      };
+
+      const GameStatus = {
+        READY: 0,
+        PLAYING: 1,
+        PAUSED: 2,
+        GAME_OVER: 3,
+      };
+
+      // --- from constants.ts ---
+      const GRID_SIZE = 30;
+      const INITIAL_TICK_RATE_MS = 150;
+      const BOMB_INTERVAL_TICKS = 30000 / INITIAL_TICK_RATE_MS;
+      const EGG_TYPES_CONFIG = {
+        [EggType.GREEN]: { class: 'bg-green-500', color: '#22c55e', sizeChange: 0, score: 10 },
+        [EggType.RED]: { class: 'bg-red-500', color: '#ef4444', sizeChange: 3, score: 50 },
+        [EggType.BLUE]: { class: 'bg-blue-500', color: '#3b82f6', sizeChange: 1, score: 20 },
+        [EggType.PURPLE]: { class: 'bg-purple-500', color: '#a855f7', sizeChange: 2, score: 30 },
+      };
+      const SNAKE_COLOR = '#4ade80';
+      const BOMB_COLOR = '#ef4444';
+      const BACKGROUND_COLOR_1 = '#182825';
+      const BACKGROUND_COLOR_2 = '#0d1a18';
+      const GRID_COLOR = 'rgba(255, 255, 255, 0.05)';
+      const MIN_TICK_RATE_MS = 40;
+      const SPEED_INCREASE_INTERVAL_MS = 3000;
+      const SPEED_INCREASE_FACTOR = 0.995;
+      const LETHAL_BOMB_INTERVAL_MS = 7000;
+      const LETHAL_BOMB_COLOR = '#f97316';
+      const BOMB_LIFETIME_MS = 2000;
+      const EGG_HIGHLIGHT_DURATION_MS = 3000;
+      const EGG_LIFETIME_MS = 10000;
+
+      // --- from hooks/useAudio.ts ---
+      const useAudio = () => {
+        const audioContextRef = React.useRef(null);
+
+        const getContext = React.useCallback(() => {
+          if (!audioContextRef.current) {
+            try {
+              audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+            } catch (e) {
+              console.error("Web Audio API is not supported in this browser");
+            }
+          }
+          return audioContextRef.current;
+        }, []);
+
+        const playSound = React.useCallback((type) => {
+          const audioContext = getContext();
+          if (!audioContext) return;
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+
+          switch (type) {
+            case 'collect':
+              oscillator.type = 'sine';
+              oscillator.frequency.setValueAtTime(440.0, audioContext.currentTime);
+              gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.3);
+              oscillator.start(audioContext.currentTime);
+              oscillator.stop(audioContext.currentTime + 0.3);
+              break;
+            case 'bomb':
+              oscillator.type = 'square';
+              oscillator.frequency.setValueAtTime(220.0, audioContext.currentTime);
+              gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.4);
+              oscillator.start(audioContext.currentTime);
+              oscillator.stop(audioContext.currentTime + 0.4);
+              break;
+            case 'gameOver':
+              oscillator.type = 'sawtooth';
+              oscillator.frequency.setValueAtTime(110.0, audioContext.currentTime);
+              oscillator.frequency.exponentialRampToValueAtTime(55.0, audioContext.currentTime + 0.8);
+              gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.8);
+              oscillator.start(audioContext.currentTime);
+              oscillator.stop(audioContext.currentTime + 0.8);
+              break;
+          }
+        }, [getContext]);
+
+        return { playCollectSound: () => playSound('collect'), playBombSound: () => playSound('bomb'), playGameOverSound: () => playSound('gameOver') };
+      };
+
+      // --- from hooks/useGameLogic.ts ---
+      const useGameLogic = () => {
+        const getRandomPosition = (exclude = []) => {
+          let position;
+          do {
+            position = {
+              x: Math.floor(Math.random() * GRID_SIZE),
+              y: Math.floor(Math.random() * GRID_SIZE),
+            };
+          } while (exclude.some(p => p.x === position.x && p.y === position.y));
+          return position;
+        };
+
+        const spawnEgg = (exclude, spawnTime) => {
+          const rand = Math.random();
+          let type;
+          if (rand < 0.4) type = EggType.GREEN;
+          else if (rand < 0.65) type = EggType.BLUE;
+          else if (rand < 0.85) type = EggType.PURPLE;
+          else type = EggType.RED;
+
+          return {
+            position: getRandomPosition(exclude),
+            type,
+            id: Date.now() + Math.random(),
+            spawnTime,
+          };
+        };
+
+        const getInitialState = () => {
+            const startPos = { x: Math.floor(GRID_SIZE / 2), y: Math.floor(GRID_SIZE / 2) };
+            const initialSnake = [startPos, {x: startPos.x-1, y: startPos.y}];
+            return {
+                snake: initialSnake,
+                direction: Direction.RIGHT,
+                nextDirection: null,
+                eggs: [spawnEgg(initialSnake, 0)],
+                bombs: [],
+                lethalBombs: [],
+                score: 0,
+                status: GameStatus.READY,
+                collectedEggCounts: {
+                    [EggType.GREEN]: 0,
+                    [EggType.RED]: 0,
+                    [EggType.BLUE]: 0,
+                    [EggType.PURPLE]: 0,
+                },
+                bombTimer: 0,
+                lethalBombTimer: 0,
+                speedIncreaseTimer: 0,
+                tickRate: INITIAL_TICK_RATE_MS,
+                totalGameTime: 0,
+            };
+        };
+
+        function gameReducer(state, action) {
+          switch (action.type) {
+            case 'START_GAME':
+              if (state.status !== GameStatus.READY) return state;
+              return {
+                ...getInitialState(),
+                status: GameStatus.PLAYING,
+              };
+            case 'PAUSE_GAME':
+                if(state.status !== GameStatus.PLAYING) return state;
+                return { ...state, status: GameStatus.PAUSED };
+            case 'RESUME_GAME':
+                if(state.status !== GameStatus.PAUSED) return state;
+                return { ...state, status: GameStatus.PLAYING, nextDirection: null };
+            case 'RESTART_GAME':
+              return getInitialState();
+            case 'CHANGE_DIRECTION': {
+              if (state.status !== GameStatus.PLAYING) return state;
+              const newDirection = action.payload;
+              const currentDirection = state.direction;
+              if (
+                (newDirection === Direction.UP && currentDirection === Direction.DOWN) ||
+                (newDirection === Direction.DOWN && currentDirection === Direction.UP) ||
+                (newDirection === Direction.LEFT && currentDirection === Direction.RIGHT) ||
+                (newDirection === Direction.RIGHT && currentDirection === Direction.LEFT)
+              ) {
+                return state;
+              }
+              return { ...state, nextDirection: newDirection };
+            }
+            case 'GAME_TICK': {
+              if (state.status !== GameStatus.PLAYING) return state;
+              const newTotalGameTime = state.totalGameTime + state.tickRate;
+              let newBombs = state.bombs.filter(bomb => newTotalGameTime - bomb.spawnTime < BOMB_LIFETIME_MS);
+              let newLethalBombs = state.lethalBombs.filter(bomb => newTotalGameTime - bomb.spawnTime < BOMB_LIFETIME_MS);
+              const eggsToKeep = [];
+              let expiredEggCount = 0;
+              for (const egg of state.eggs) {
+                  if (newTotalGameTime - egg.spawnTime > EGG_LIFETIME_MS) {
+                      expiredEggCount++;
+                  } else {
+                      eggsToKeep.push(egg);
+                  }
+              }
+              let newEggs = [...eggsToKeep];
+              if (expiredEggCount > 0) {
+                  const exclude = [...state.snake, ...newBombs.map(b => b.position), ...newLethalBombs.map(b => b.position), ...newEggs.map(e => e.position)];
+                  for (let i = 0; i < expiredEggCount; i++) {
+                      const newSpawnedEgg = spawnEgg(exclude, newTotalGameTime);
+                      newEggs.push(newSpawnedEgg);
+                      exclude.push(newSpawnedEgg.position);
+                  }
+              }
+              let newSnake = [...state.snake];
+              let newHead = { ...newSnake[0] };
+              let currentDirection = state.direction;
+              if(state.nextDirection !== null) {
+                  currentDirection = state.nextDirection;
+              }
+              switch (currentDirection) {
+                case Direction.UP: newHead.y -= 1; break;
+                case Direction.DOWN: newHead.y += 1; break;
+                case Direction.LEFT: newHead.x -= 1; break;
+                case Direction.RIGHT: newHead.x += 1; break;
+              }
+              if (newHead.x < 0 || newHead.x >= GRID_SIZE || newHead.y < 0 || newHead.y >= GRID_SIZE) {
+                return { ...state, status: GameStatus.GAME_OVER };
+              }
+              for (let i = 1; i < newSnake.length; i++) {
+                if (newHead.x === newSnake[i].x && newHead.y === newSnake[i].y) {
+                  return { ...state, status: GameStatus.GAME_OVER };
+                }
+              }
+              const hitLethalBomb = newLethalBombs.some(bomb => bomb.position.x === newHead.x && bomb.position.y === newHead.y);
+              if (hitLethalBomb) {
+                return { ...state, snake: newSnake, status: GameStatus.GAME_OVER };
+              }
+              newSnake.unshift(newHead);
+              let newScore = state.score;
+              let newCollectedEggCounts = {...state.collectedEggCounts};
+              let growth = 0;
+              const eatenEggIndex = newEggs.findIndex(egg => egg.position.x === newHead.x && egg.position.y === newHead.y);
+              if (eatenEggIndex !== -1) {
+                const eatenEgg = newEggs[eatenEggIndex];
+                const eggConfig = EGG_TYPES_CONFIG[eatenEgg.type];
+                growth = eggConfig.sizeChange;
+                newScore += eggConfig.score;
+                newCollectedEggCounts[eatenEgg.type]++;
+                newEggs.splice(eatenEggIndex, 1);
+                newEggs.push(spawnEgg([...newSnake, ...newBombs.map(b => b.position)], newTotalGameTime));
+              }
+              const hitBombIndex = newBombs.findIndex(bomb => bomb.position.x === newHead.x && bomb.position.y === newHead.y);
+              if (hitBombIndex !== -1) {
+                newBombs.splice(hitBombIndex, 1);
+                const segmentsToRemove = 3;
+                if (newSnake.length <= segmentsToRemove + 1) {
+                    return { ...state, snake: [], status: GameStatus.GAME_OVER };
+                }
+                newSnake.splice(newSnake.length - segmentsToRemove, segmentsToRemove);
+                newScore = Math.max(0, newScore - 50);
+              }
+              if (growth === 0) {
+                newSnake.pop();
+              } else {
+                const tail = newSnake[newSnake.length - 1];
+                for(let i = 0; i < growth; i++) {
+                    newSnake.push({...tail});
+                }
+              }
+              let newBombTimer = state.bombTimer + 1;
+              if (newBombTimer >= BOMB_INTERVAL_TICKS) {
+                  newBombTimer = 0;
+                  if (newBombs.length < 5) {
+                      const exclude = [...newSnake, ...newEggs.map(e => e.position), ...newBombs.map(b => b.position), ...newLethalBombs.map(b => b.position)];
+                      newBombs.push({ position: getRandomPosition(exclude), id: Date.now(), spawnTime: newTotalGameTime });
+                  }
+              }
+              let newTickRate = state.tickRate;
+              let newSpeedIncreaseTimer = state.speedIncreaseTimer + state.tickRate;
+              let newLethalBombTimer = state.lethalBombTimer + state.tickRate;
+              if (newSpeedIncreaseTimer >= SPEED_INCREASE_INTERVAL_MS) {
+                newTickRate = Math.max(state.tickRate * SPEED_INCREASE_FACTOR, MIN_TICK_RATE_MS);
+                newSpeedIncreaseTimer = 0;
+              }
+              if (newLethalBombTimer >= LETHAL_BOMB_INTERVAL_MS) {
+                  if (newLethalBombs.length < 3) { 
+                      const exclude = [...newSnake, ...newEggs.map(e => e.position), ...newBombs.map(b => b.position), ...newLethalBombs.map(b => b.position)];
+                      newLethalBombs.push({ position: getRandomPosition(exclude), id: Date.now(), spawnTime: newTotalGameTime });
+                  }
+                  newLethalBombTimer = 0;
+              }
+              return {
+                ...state,
+                snake: newSnake,
+                direction: currentDirection,
+                nextDirection: null,
+                eggs: newEggs,
+                bombs: newBombs,
+                lethalBombs: newLethalBombs,
+                score: newScore,
+                collectedEggCounts: newCollectedEggCounts,
+                bombTimer: newBombTimer,
+                lethalBombTimer: newLethalBombTimer,
+                speedIncreaseTimer: newSpeedIncreaseTimer,
+                tickRate: newTickRate,
+                totalGameTime: newTotalGameTime,
+              };
+            }
+            default:
+              return state;
+          }
+        }
+
+        const [gameState, dispatch] = React.useReducer(gameReducer, getInitialState());
+        const { playCollectSound, playBombSound, playGameOverSound } = useAudio();
+        const lastStatusRef = React.useRef(gameState.status);
+        const prevStateRef = React.useRef(gameState);
+
+        React.useEffect(() => {
+          if (gameState.status === GameStatus.PLAYING) {
+            const gameLoop = setInterval(() => {
+              dispatch({ type: 'GAME_TICK' });
+            }, gameState.tickRate);
+            return () => clearInterval(gameLoop);
+          }
+        }, [gameState.status, gameState.tickRate]);
+
+        React.useEffect(() => {
+          if (gameState.status === GameStatus.GAME_OVER && lastStatusRef.current !== GameStatus.GAME_OVER) {
+            playGameOverSound();
+          }
+          const prevState = prevStateRef.current;
+          if (gameState.score > prevState.score) {
+              playCollectSound();
+          }
+          if (prevState.snake.length > gameState.snake.length && gameState.status === GameStatus.PLAYING) {
+              playBombSound();
+          }
+          lastStatusRef.current = gameState.status;
+          prevStateRef.current = gameState;
+        }, [gameState, playGameOverSound, playCollectSound, playBombSound]);
+
+        const handleKeyDown = React.useCallback((e) => {
+          if (gameState.status === GameStatus.READY && (e.key.startsWith('Arrow') || e.key === ' ' || ['w','a','s','d'].includes(e.key))) {
+              dispatch({ type: 'START_GAME' });
+          }
+          let newDirection = null;
+          switch (e.key) {
+            case 'ArrowUp': case 'w': newDirection = Direction.UP; break;
+            case 'ArrowDown': case 's': newDirection = Direction.DOWN; break;
+            case 'ArrowLeft': case 'a': newDirection = Direction.LEFT; break;
+            case 'ArrowRight': case 'd': newDirection = Direction.RIGHT; break;
+            case ' ':
+              e.preventDefault();
+              if (gameState.status === GameStatus.PLAYING) dispatch({ type: 'PAUSE_GAME' });
+              else if (gameState.status === GameStatus.PAUSED) dispatch({ type: 'RESUME_GAME' });
+              return;
+            default: return;
+          }
+          if (newDirection !== null) {
+              e.preventDefault();
+              dispatch({ type: 'CHANGE_DIRECTION', payload: newDirection });
+          }
+        }, [gameState.status, dispatch]);
+
+        React.useEffect(() => {
+          window.addEventListener('keydown', handleKeyDown);
+          return () => window.removeEventListener('keydown', handleKeyDown);
+        }, [handleKeyDown]);
+
+        return { gameState, dispatch };
+      };
+
+      // --- from components/GameCanvas.tsx ---
+      const GameCanvas = ({ gameState }) => {
+        const canvasRef = React.useRef(null);
+        React.useEffect(() => {
+          const canvas = canvasRef.current;
+          if (!canvas) return;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return;
+          const { snake, eggs, bombs, lethalBombs, totalGameTime } = gameState;
+          const { width, height } = canvas.getBoundingClientRect();
+          canvas.width = width;
+          canvas.height = height;
+          const cellSize = Math.min(width, height) / GRID_SIZE;
+          const xOffset = (width - cellSize * GRID_SIZE) / 2;
+          const yOffset = (height - cellSize * GRID_SIZE) / 2;
+          const gradient = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, Math.max(width, height) / 1.5);
+          gradient.addColorStop(0, BACKGROUND_COLOR_1);
+          gradient.addColorStop(1, BACKGROUND_COLOR_2);
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, 0, width, height);
+          ctx.strokeStyle = GRID_COLOR;
+          ctx.lineWidth = 1;
+          for (let i = 0; i <= GRID_SIZE; i++) {
+              ctx.beginPath();
+              ctx.moveTo(xOffset + i * cellSize, yOffset);
+              ctx.lineTo(xOffset + i * cellSize, yOffset + GRID_SIZE * cellSize);
+              ctx.stroke();
+              ctx.beginPath();
+              ctx.moveTo(xOffset, yOffset + i * cellSize);
+              ctx.lineTo(xOffset + GRID_SIZE * cellSize, yOffset + i * cellSize);
+              ctx.stroke();
+          }
+          ctx.fillStyle = SNAKE_COLOR;
+          snake.forEach((segment, index) => {
+            const segmentSize = index === 0 ? cellSize * 0.9 : cellSize * 0.8;
+            const offset = (cellSize - segmentSize) / 2;
+            ctx.beginPath();
+            ctx.roundRect(xOffset + segment.x * cellSize + offset, yOffset + segment.y * cellSize + offset, segmentSize, segmentSize, [5]);
+            ctx.fill();
+            if (index === 0) {
+              ctx.fillStyle = 'white';
+              const eyeSize = cellSize * 0.1;
+              const headX = xOffset + segment.x * cellSize;
+              const headY = yOffset + segment.y * cellSize;
+              let e1x, e1y, e2x, e2y;
+              switch (gameState.direction) {
+                  case Direction.UP: e1x = headX + cellSize * 0.3; e1y = headY + cellSize * 0.3; e2x = headX + cellSize * 0.7; e2y = headY + cellSize * 0.3; break;
+                  case Direction.DOWN: e1x = headX + cellSize * 0.3; e1y = headY + cellSize * 0.7; e2x = headX + cellSize * 0.7; e2y = headY + cellSize * 0.7; break;
+                  case Direction.LEFT: e1x = headX + cellSize * 0.3; e1y = headY + cellSize * 0.3; e2x = headX + cellSize * 0.3; e2y = headY + cellSize * 0.7; break;
+                  case Direction.RIGHT: e1x = headX + cellSize * 0.7; e1y = headY + cellSize * 0.3; e2x = headX + cellSize * 0.7; e2y = headY + cellSize * 0.7; break;
+              }
+              ctx.beginPath(); ctx.arc(e1x, e1y, eyeSize, 0, 2 * Math.PI); ctx.fill();
+              ctx.beginPath(); ctx.arc(e2x, e2y, eyeSize, 0, 2 * Math.PI); ctx.fill();
+            }
+          });
+          eggs.forEach(egg => {
+            const config = EGG_TYPES_CONFIG[egg.type];
+            ctx.fillStyle = config.color;
+            const isOld = totalGameTime - egg.spawnTime > EGG_HIGHLIGHT_DURATION_MS;
+            if (isOld) { ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 25; }
+            else { ctx.shadowColor = config.color; ctx.shadowBlur = 15; }
+            ctx.beginPath();
+            ctx.arc(xOffset + egg.position.x * cellSize + cellSize / 2, yOffset + egg.position.y * cellSize + cellSize / 2, cellSize / 2.5, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+          });
+          ctx.fillStyle = BOMB_COLOR;
+          bombs.forEach(bomb => {
+              ctx.shadowColor = BOMB_COLOR; ctx.shadowBlur = 20;
+              ctx.beginPath();
+              ctx.arc(xOffset + bomb.position.x * cellSize + cellSize / 2, yOffset + bomb.position.y * cellSize + cellSize / 2, cellSize / 2.0, 0, 2 * Math.PI);
+              ctx.fill(); ctx.shadowBlur = 0;
+          });
+          ctx.fillStyle = LETHAL_BOMB_COLOR;
+          lethalBombs.forEach(bomb => {
+              ctx.shadowColor = LETHAL_BOMB_COLOR; ctx.shadowBlur = 25;
+              ctx.beginPath();
+              ctx.arc(xOffset + bomb.position.x * cellSize + cellSize / 2, yOffset + bomb.position.y * cellSize + cellSize / 2, cellSize / 1.7, 0, 2 * Math.PI);
+              ctx.fill(); ctx.shadowBlur = 0;
+          });
+        }, [gameState]);
+        return <canvas ref={canvasRef} className="w-full h-full rounded-xl shadow-2xl shadow-black/50" />;
+      };
+
+
+
+      // --- from components/GameOverModal.tsx ---
+      const GameOverModal = ({ score, onRestart }) => (
+          <div className="absolute inset-0 bg-black/70 flex flex-col justify-center items-center z-20 backdrop-blur-sm">
+            <div className="text-center p-8 rounded-2xl bg-gray-800/80 shadow-lg border border-gray-700">
+              <h2 className="text-6xl font-bold text-red-500 animate-pulse">Game Over</h2>
+              <p className="text-2xl mt-4 text-gray-300">Final Score</p>
+              <p className="text-7xl font-mono font-bold text-green-400 my-4">{score}</p>
+              <button onClick={onRestart} className="mt-6 px-8 py-3 bg-green-500 text-white font-bold text-xl rounded-lg hover:bg-green-600 transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-green-400 focus:ring-opacity-50">Restart Game</button>
+            </div>
+          </div>
+      );
+
+      // --- Mobile Swipe Controls ---
+      const useSwipeControls = (onDirectionChange) => {
+        const [touchStart, setTouchStart] = React.useState(null);
+        const [touchEnd, setTouchEnd] = React.useState(null);
+
+        const minSwipeDistance = 50;
+
+        const onTouchStart = (e) => {
+          setTouchEnd(null);
+          setTouchStart({
+            x: e.targetTouches[0].clientX,
+            y: e.targetTouches[0].clientY
+          });
+        };
+
+        const onTouchMove = (e) => {
+          setTouchEnd({
+            x: e.targetTouches[0].clientX,
+            y: e.targetTouches[0].clientY
+          });
+        };
+
+        const onTouchEnd = () => {
+          if (!touchStart || !touchEnd) return;
+          
+          const distanceX = touchStart.x - touchEnd.x;
+          const distanceY = touchStart.y - touchEnd.y;
+          const isLeftSwipe = distanceX > minSwipeDistance;
+          const isRightSwipe = distanceX < -minSwipeDistance;
+          const isUpSwipe = distanceY > minSwipeDistance;
+          const isDownSwipe = distanceY < -minSwipeDistance;
+
+          if (Math.abs(distanceX) > Math.abs(distanceY)) {
+            // Horizontal swipe
+            if (isLeftSwipe) onDirectionChange(Direction.LEFT);
+            if (isRightSwipe) onDirectionChange(Direction.RIGHT);
+          } else {
+            // Vertical swipe
+            if (isUpSwipe) onDirectionChange(Direction.UP);
+            if (isDownSwipe) onDirectionChange(Direction.DOWN);
+          }
+        };
+
+        return { onTouchStart, onTouchMove, onTouchEnd };
+      };
+
+      // --- from App.tsx ---
+      const Scoreboard = ({ score, collectedEggCounts, status, onPause, onResume, onExit }) => {
+        const ControlButton = ({ onClick, children, title }) => (
+          <button
+              onClick={onClick}
+              title={title}
+              className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-400"
+          >{children}</button>
+        );
+        const toggleFullScreen = () => {
+          if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(err => alert(`Error: ${err.message}`));
+          else document.exitFullscreen();
+        };
+        
+        return (
+          <div className="relative flex flex-col items-center p-4 bg-black/30 rounded-xl backdrop-blur-sm shadow-lg border border-white/10 mb-4 w-full max-w-md mx-auto">
+            {/* Control buttons in top right corner */}
+            <div className="absolute top-2 right-2 flex items-center space-x-2">
+              {status === GameStatus.PLAYING && ( 
+                <ControlButton onClick={onPause} title="Pause Game (Space)">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </ControlButton> 
+              )}
+              {status === GameStatus.PAUSED && ( 
+                <ControlButton onClick={onResume} title="Resume Game (Space)">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </ControlButton> 
+              )}
+              <ControlButton onClick={toggleFullScreen} title="Toggle Fullscreen">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+                </svg>
+              </ControlButton>
+              <ControlButton onClick={onExit} title="Exit Game">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              </ControlButton>
+            </div>
+            
+            {/* Score section - text above number */}
+            <div className="flex flex-col items-center w-full">
+                <span className="text-sm font-semibold text-gray-400 mb-1">SCORE</span>
+                <span className="text-4xl font-mono font-bold text-green-400">{score}</span>
+            </div>
+            
+            <div className="mt-3 w-full">
+              <span className="text-xs font-semibold text-gray-400 block mb-2 text-center">COLLECTED</span>
+              <div className="flex items-center justify-center space-x-4">
+                {Object.values(EggType).map((type) => (
+                  <div key={type} className="flex items-center space-x-1.5">
+                    <div className={`w-3 h-3 rounded-full ${EGG_TYPES_CONFIG[type].class} shadow-md`}></div>
+                    <span className="font-mono text-lg text-white">{collectedEggCounts[type]}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      const App = () => {
+        const { gameState, dispatch } = useGameLogic();
+        const handleRestart = () => dispatch({ type: 'RESTART_GAME' });
+        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        const handleDirectionChange = (direction) => {
+          if (gameState.status === GameStatus.READY) {
+            dispatch({ type: 'START_GAME' });
+          }
+          dispatch({ type: 'CHANGE_DIRECTION', payload: direction });
+        };
+
+        // Control handlers
+        const handlePause = () => dispatch({ type: 'PAUSE_GAME' });
+        const handleResume = () => dispatch({ type: 'RESUME_GAME' });
+        const handleExit = () => dispatch({ type: 'RESTART_GAME' });
+
+        // Use swipe controls for mobile
+        const swipeHandlers = useSwipeControls(handleDirectionChange);
+
+        return (
+          <div className="w-screen h-screen flex flex-col justify-center items-center p-2 sm:p-4 md:p-8 bg-gray-900 font-sans">
+            <div className="w-full max-w-[600px] flex flex-col items-center">
+              <Scoreboard 
+                score={gameState.score} 
+                collectedEggCounts={gameState.collectedEggCounts}
+                status={gameState.status}
+                onPause={handlePause}
+                onResume={handleResume}
+                onExit={handleExit}
+              />
+              <div 
+                className="relative w-full aspect-square max-w-[90vh] max-h-[70vh] flex justify-center items-center"
+                onTouchStart={isTouchDevice ? swipeHandlers.onTouchStart : undefined}
+                onTouchMove={isTouchDevice ? swipeHandlers.onTouchMove : undefined}
+                onTouchEnd={isTouchDevice ? swipeHandlers.onTouchEnd : undefined}
+              >
+                {gameState.status === GameStatus.GAME_OVER && <GameOverModal score={gameState.score} onRestart={handleRestart} />}
+                {gameState.status === GameStatus.READY && (
+                    <div className="absolute inset-0 bg-black/60 flex flex-col justify-center items-center z-20 text-center p-4">
+                         <h2 className="text-4xl md:text-6xl font-bold text-green-400 mb-4">Forest Snake</h2>
+                         <p className="mt-4 text-lg text-gray-300">Use Arrow Keys or Swipe to Move</p>
+                         <div className="flex flex-col space-y-4 mt-8">
+                           <button onClick={() => dispatch({type: 'START_GAME'})} className="px-8 py-3 bg-green-500 text-white font-bold text-xl rounded-lg hover:bg-green-600 transition-transform transform hover:scale-105">Start Game</button>
+                           <button onClick={() => window.location.href = '../game.html'} className="px-8 py-3 bg-gray-600 text-white font-bold text-lg rounded-lg hover:bg-gray-700 transition-transform transform hover:scale-105">Back to Games</button>
+                         </div>
+                    </div>
+                )}
+                {gameState.status === GameStatus.PAUSED && (
+                     <div className="absolute inset-0 bg-black/60 flex flex-col justify-center items-center z-20 text-center">
+                         <h2 className="text-5xl font-bold text-yellow-400">Paused</h2>
+                         <button onClick={() => dispatch({type: 'RESUME_GAME'})} className="mt-8 px-8 py-3 bg-yellow-500 text-white font-bold text-xl rounded-lg hover:bg-yellow-600 transition-transform transform hover:scale-105">Resume</button>
+                     </div>
+                )}
+                <GameCanvas gameState={gameState} />
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      // --- from index.tsx ---
+      const rootElement = document.getElementById('root');
+      const root = ReactDOM.createRoot(rootElement);
+      root.render(
+        <React.StrictMode>
+          <App />
+        </React.StrictMode>
+      );
+
+    </script>
+  </body>
+</html>

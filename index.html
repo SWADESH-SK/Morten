@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Pixel Quest - An immersive pixel art adventure game with earthy aesthetics">
+    <meta name="keywords" content="pixel art, game, adventure, retro, earth tones">
+    <title>MORTEN GAMES</title>
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="./LandingPage.css" as="style">
+    
+    <!-- React CDN for development -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Favicon and app icons -->
+    <link rel="icon" type="image/x-icon" href="data:image/x-icon;base64,AAABAAEAEBAAAAAAAABoBQAAFgAAACgAAAAQAAAAIAAAAAEACAAAAAAAAAEAAAAAAAAAAAAAAAEAAAAAAAAAGBgYAB4eHgAkJCQAKioqADAwMAA2NjYAPDw8AEJCQgBISEgATk5OAFRUVABaWloAYGBgAGZmZgBsbGwAcnJyAHh4eAB+fn4AhISEAIqKigCQkJAAhISEAHh4eABsbGwAYGBgAFRUVABISEgAPDw8ADAwMAAsLCwAJiYmACAgIAAeHh4AJiYmACwsLAAyMjIAODg4AD4+PgBEREQASkoKAFBQUABWVlYAXFxcAGJiYgBoaGgAbm5uAHR0dAB6enoAgICAAIaGhgCMjIwAkpKSAJiYmACenp4ApKSkAKqqqgCwsLAAtra2ALy8vADCwsIAyMjIAM7OzgDU1NQA2traAODg4ADm5uYA7OzsAPIyMgD4+PgA/v7+AAaKigAGjIyAAoyMgAKOjoACkJCAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgAKMjIACjIyAAoyMgA==">
+    
+    <style>
+        /* Critical CSS for loading state */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Courier New', monospace;
+            background: #1a3d1a;
+            overflow: hidden;
+        }
+        
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #1a3d1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        
+        .loading-pixel {
+            width: 20px;
+            height: 20px;
+            background: #4a7c4a;
+            margin: 2px;
+            animation: pixelPulse 1s ease-in-out infinite alternate;
+            box-shadow: 2px 2px 0px #0f2a0f;
+        }
+        
+        .loading-pixel:nth-child(2) { animation-delay: 0.2s; }
+        .loading-pixel:nth-child(3) { animation-delay: 0.4s; }
+        
+        @keyframes pixelPulse {
+            from { opacity: 0.4; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1.2); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading indicator -->
+    <div id="loading">
+        <div class="loading-pixel"></div>
+        <div class="loading-pixel"></div>
+        <div class="loading-pixel"></div>
+    </div>
+    
+    <!-- React root -->
+    <div id="root"></div>
+    
+    <!-- Main React Component -->
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        // Import the LandingPage component (inline for demo)
+        function LandingPage() {
+            const [isLoaded, setIsLoaded] = useState(false);
+
+            useEffect(() => {
+                // Hide loading indicator and show page
+                const timer = setTimeout(() => {
+                    setIsLoaded(true);
+                    document.getElementById('loading').style.display = 'none';
+                }, 1500);
+                return () => clearTimeout(timer);
+            }, []);
+
+            const handleStartClick = () => {
+                // Navigate to the game page
+                console.log('Starting game...');
+                window.location.href = 'game.html';
+            };
+
+            return (
+                <div className={`landing-page ${isLoaded ? 'loaded' : ''}`}>
+                    <div className="pixel-background">
+                        <div className="background-pattern"></div>
+                        
+                        {/* Game Title */}
+                        <header className="game-header">
+                            <h1 className="pixel-title">MORTEN GAMES</h1>
+                            <p className="pixel-subtitle">An Adventure Awaits</p>
+                        </header>
+
+                        {/* Decorative Elements */}
+                        <div className="pixel-decorations">
+                            <div className="pixel-tree pixel-tree-left"></div>
+                            <div className="pixel-tree pixel-tree-right"></div>
+                            <div className="pixel-rocks"></div>
+                        </div>
+
+                        {/* Main Start Button */}
+                        <div className="start-button-container">
+                            <button 
+                                className="pixel-start-button" 
+                                onClick={handleStartClick}
+                                aria-label="Start the pixel art adventure game"
+                            >
+                                <span className="button-text">START</span>
+                                <div className="button-glow"></div>
+                                <div className="button-particles">
+                                    <span className="particle"></span>
+                                    <span className="particle"></span>
+                                    <span className="particle"></span>
+                                    <span className="particle"></span>
+                                </div>
+                            </button>
+                            <p className="pixel-text-below-button">Press START to begin your journey</p>
+                        </div>
+
+                        {/* Footer */}
+                        <footer className="game-footer">
+                        </footer>
+                    </div>
+                </div>
+            );
+        }
+        
+        // Render the application
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<LandingPage />);
+    </script>
+    
+    <!-- Load CSS after React component -->
+    <link rel="stylesheet" href="./LandingPage.css">
+</body>
+</html>

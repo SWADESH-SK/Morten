@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyberpunk Tic Tac Toe</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Reset and Base Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Orbitron', monospace;
+            background: radial-gradient(ellipse at center, #1a1a2e 0%, #16213e 50%, #0f0f0f 100%);
+            color: #fff;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        #root {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        /* Background Effects */
+        .background-effects {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .neon-grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(0, 255, 255, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 255, 0.1) 1px, transparent 1px);
+            background-size: 100px 100px;
+            animation: gridPulse 4s ease-in-out infinite alternate;
+        }
+
+        .floating-particles::before,
+        .floating-particles::after {
+            content: '';
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: #ff00ff;
+            border-radius: 50%;
+            animation: float 6s ease-in-out infinite alternate;
+            box-shadow: 0 0 10px #ff00ff;
+        }
+
+        .floating-particles::before {
+            top: 20%;
+            left: 10%;
+            animation-delay: -2s;
+        }
+
+        .floating-particles::after {
+            top: 70%;
+            right: 15%;
+            background: #00ffff;
+            box-shadow: 0 0 10px #00ffff;
+            animation-delay: -4s;
+        }
+
+        @keyframes gridPulse {
+            0% { opacity: 0.3; }
+            100% { opacity: 0.1; }
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px) translateX(0px); }
+            33% { transform: translateY(-20px) translateX(10px); }
+            66% { transform: translateY(10px) translateX(-5px); }
+            100% { transform: translateY(-10px) translateX(15px); }
+        }
+
+        /* Game Container */
+        .game-container {
+            text-align: center;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00ffff;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 
+                0 0 30px rgba(0, 255, 255, 0.3),
+                inset 0 0 30px rgba(0, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            max-width: 500px;
+            width: 100%;
+            position: relative;
+        }
+
+        /* Game Title */
+        .game-title {
+            font-family: 'Orbitron', monospace;
+            font-size: 2.5rem;
+            font-weight: 900;
+            color: #00ffff;
+            text-shadow: 
+                0 0 10px #00ffff,
+                0 0 20px #00ffff,
+                0 0 30px #00ffff;
+            margin-bottom: 20px;
+            letter-spacing: 3px;
+            animation: titleGlow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes titleGlow {
+            0% { 
+                text-shadow: 
+                    0 0 10px #00ffff,
+                    0 0 20px #00ffff,
+                    0 0 30px #00ffff;
+            }
+            100% { 
+                text-shadow: 
+                    0 0 20px #00ffff,
+                    0 0 30px #00ffff,
+                    0 0 40px #00ffff;
+            }
+        }
+
+        /* Result Text */
+        .result-text {
+            margin-bottom: 25px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .result {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            transition: all 0.3s ease;
+        }
+
+        .result.playing {
+            color: #ffffff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+
+        .result.winner {
+            color: #00ff00;
+            text-shadow: 
+                0 0 10px #00ff00,
+                0 0 20px #00ff00;
+            animation: winnerPulse 1s ease-in-out infinite alternate;
+        }
+
+        .result.draw {
+            color: #ffff00;
+            text-shadow: 
+                0 0 10px #ffff00,
+                0 0 20px #ffff00;
+        }
+
+        @keyframes winnerPulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.05); }
+        }
+
+        /* Game Board */
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 8px;
+            width: 300px;
+            height: 300px;
+            margin: 0 auto 30px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid #333;
+            border-radius: 15px;
+            box-shadow: inset 0 0 20px rgba(0, 255, 255, 0.1);
+        }
+
+        /* Game Cells */
+        .cell {
+            background: rgba(20, 20, 40, 0.8);
+            border: 2px solid #444;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cell::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .cell:hover::before {
+            left: 100%;
+        }
+
+        .cell:hover {
+            border-color: #00ffff;
+            box-shadow: 
+                0 0 15px rgba(0, 255, 255, 0.3),
+                inset 0 0 15px rgba(0, 255, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .cell-content {
+            font-size: 3rem;
+            font-weight: 900;
+            font-family: 'Orbitron', monospace;
+            transition: all 0.3s ease;
+        }
+
+        /* Player X Styles */
+        .cell.filled.x .cell-content {
+            color: #ff00ff;
+            text-shadow: 
+                0 0 10px #ff00ff,
+                0 0 20px #ff00ff,
+                0 0 30px #ff00ff;
+            animation: letterGlow 1.5s ease-in-out infinite alternate;
+        }
+
+        .cell.filled.x {
+            border-color: #ff00ff;
+            box-shadow: 
+                0 0 15px rgba(255, 0, 255, 0.4),
+                inset 0 0 15px rgba(255, 0, 255, 0.1);
+        }
+
+        /* Player O Styles */
+        .cell.filled.o .cell-content {
+            color: #00ffff;
+            text-shadow: 
+                0 0 10px #00ffff,
+                0 0 20px #00ffff,
+                0 0 30px #00ffff;
+            animation: letterGlow 1.5s ease-in-out infinite alternate;
+        }
+
+        .cell.filled.o {
+            border-color: #00ffff;
+            box-shadow: 
+                0 0 15px rgba(0, 255, 255, 0.4),
+                inset 0 0 15px rgba(0, 255, 255, 0.1);
+        }
+
+        /* Winning Cells */
+        .cell.winning {
+            border-color: #00ff00 !important;
+            box-shadow: 
+                0 0 25px rgba(0, 255, 0, 0.6),
+                inset 0 0 25px rgba(0, 255, 0, 0.2) !important;
+            animation: winningCell 1s ease-in-out infinite alternate;
+        }
+
+        .cell.winning .cell-content {
+            color: #00ff00 !important;
+            text-shadow: 
+                0 0 15px #00ff00,
+                0 0 25px #00ff00,
+                0 0 35px #00ff00 !important;
+        }
+
+        @keyframes letterGlow {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.1); }
+        }
+
+        @keyframes winningCell {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.05); }
+        }
+
+        /* Score Section */
+        .score-section {
+            margin-bottom: 25px;
+        }
+
+        .score-display {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid #333;
+            border-radius: 10px;
+            padding: 15px 20px;
+            position: relative;
+            cursor: help;
+        }
+
+        .score-display:hover .score-tooltip {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(-5px);
+        }
+
+        .score-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .player-label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            opacity: 0.8;
+        }
+
+        .score-value {
+            font-size: 1.8rem;
+            font-weight: 900;
+            font-family: 'Orbitron', monospace;
+        }
+
+        .x-score .score-value {
+            color: #ff00ff;
+            text-shadow: 0 0 10px #ff00ff;
+        }
+
+        .o-score .score-value {
+            color: #00ffff;
+            text-shadow: 0 0 10px #00ffff;
+        }
+
+        .draw-score .score-value {
+            color: #ffff00;
+            text-shadow: 0 0 10px #ffff00;
+        }
+
+        /* Score Tooltip */
+        .score-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(10px);
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid #00ffff;
+            border-radius: 8px;
+            padding: 10px 15px;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+            z-index: 1000;
+        }
+
+        .score-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-top-color: #00ffff;
+        }
+
+        .score-tooltip div {
+            margin: 2px 0;
+            color: #fff;
+        }
+
+        /* Button Container */
+        .button-container {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Game Buttons */
+        .game-button {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00ffff;
+            border-radius: 8px;
+            color: #00ffff;
+            cursor: pointer;
+            font-family: 'Orbitron', monospace;
+            font-size: 1rem;
+            font-weight: 600;
+            padding: 12px 24px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            flex: 1;
+            max-width: 120px;
+        }
+
+        .game-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .game-button:hover::before {
+            left: 100%;
+        }
+
+        .game-button:hover {
+            color: #ffffff;
+            border-color: #ffffff;
+            box-shadow: 
+                0 0 20px rgba(0, 255, 255, 0.4),
+                inset 0 0 20px rgba(0, 255, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .game-button:active {
+            transform: translateY(0);
+            box-shadow: 
+                0 0 10px rgba(0, 255, 255, 0.3),
+                inset 0 0 10px rgba(0, 255, 255, 0.2);
+        }
+
+        .clear-button {
+            border-color: #ff00ff;
+            color: #ff00ff;
+        }
+
+        .clear-button:hover {
+            color: #ffffff;
+            border-color: #ff00ff;
+            box-shadow: 
+                0 0 20px rgba(255, 0, 255, 0.4),
+                inset 0 0 20px rgba(255, 0, 255, 0.1);
+        }
+
+        .clear-button::before {
+            background: linear-gradient(90deg, transparent, rgba(255, 0, 255, 0.2), transparent);
+        }
+
+        .exit-button {
+            border-color: #ff6600;
+            color: #ff6600;
+        }
+
+        .exit-button:hover {
+            color: #ffffff;
+            border-color: #ff6600;
+            box-shadow: 
+                0 0 20px rgba(255, 102, 0, 0.4),
+                inset 0 0 20px rgba(255, 102, 0, 0.1);
+        }
+
+        .exit-button::before {
+            background: linear-gradient(90deg, transparent, rgba(255, 102, 0, 0.2), transparent);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            #root {
+                padding: 15px;
+            }
+            
+            .game-container {
+                padding: 20px 15px;
+                max-width: 350px;
+            }
+            
+            .game-title {
+                font-size: 2rem;
+                margin-bottom: 15px;
+            }
+            
+            .game-board {
+                width: 280px;
+                height: 280px;
+                margin-bottom: 20px;
+            }
+            
+            .cell-content {
+                font-size: 2.5rem;
+            }
+            
+            .result {
+                font-size: 1.2rem;
+            }
+            
+            .button-container {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .game-button {
+                max-width: none;
+                width: 100%;
+            }
+            
+            .score-display {
+                padding: 12px 15px;
+            }
+            
+            .player-label {
+                font-size: 0.8rem;
+            }
+            
+            .score-value {
+                font-size: 1.5rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .game-container {
+                padding: 15px 10px;
+                max-width: 320px;
+            }
+            
+            .game-title {
+                font-size: 1.8rem;
+                letter-spacing: 2px;
+            }
+            
+            .game-board {
+                width: 250px;
+                height: 250px;
+                gap: 6px;
+                padding: 12px;
+            }
+            
+            .cell-content {
+                font-size: 2rem;
+            }
+            
+            .result {
+                font-size: 1.1rem;
+            }
+            
+            .game-button {
+                font-size: 0.9rem;
+                padding: 10px 20px;
+            }
+            
+            .score-display {
+                padding: 10px 12px;
+            }
+            
+            .score-value {
+                font-size: 1.3rem;
+            }
+        }
+
+        @media (min-width: 1200px) {
+            .game-container {
+                max-width: 550px;
+                padding: 40px;
+            }
+            
+            .game-title {
+                font-size: 3rem;
+            }
+            
+            .game-board {
+                width: 350px;
+                height: 350px;
+                gap: 10px;
+                padding: 20px;
+            }
+            
+            .cell-content {
+                font-size: 3.5rem;
+            }
+            
+            .result {
+                font-size: 1.8rem;
+            }
+            
+            .game-button {
+                font-size: 1.1rem;
+                padding: 15px 30px;
+                max-width: 140px;
+            }
+        }
+
+        /* Accessibility */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* High contrast mode */
+        @media (prefers-contrast: high) {
+            .game-container {
+                border-width: 3px;
+            }
+            
+            .cell {
+                border-width: 3px;
+            }
+            
+            .game-button {
+                border-width: 3px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <div class="background-effects">
+        <div class="neon-grid"></div>
+        <div class="floating-particles"></div>
+    </div>
+
+    <!-- React CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="text/babel">
+        const { useState, useEffect, useCallback, useRef } = React;
+
+        const WINNING_COMBINATIONS = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
+            [0, 3, 6], [1, 4, 7], [2, 5, 8], // columns
+            [0, 4, 8], [2, 4, 6] // diagonals
+        ];
+
+        function TicTacToe() {
+            const [board, setBoard] = useState(Array(9).fill(null));
+            const [currentPlayer, setCurrentPlayer] = useState('X');
+            const [gameStatus, setGameStatus] = useState('playing'); // 'playing', 'won', 'draw'
+            const [winner, setWinner] = useState(null);
+            const [winningLine, setWinningLine] = useState([]);
+            const [scores, setScores] = useState({ X: 0, O: 0, draws: 0 });
+
+            // Initialize audio on component mount and add global listeners
+            useEffect(() => {
+                const handleUserInteraction = async () => {
+                    await enableAudio();
+                };
+
+                // Try to initialize audio immediately
+                initAudio();
+
+                // Add event listeners for various user interactions
+                const events = ['touchstart', 'touchend', 'mousedown', 'keydown'];
+                events.forEach(event => {
+                    document.addEventListener(event, handleUserInteraction, { once: true, passive: true });
+                });
+
+                // Cleanup
+                return () => {
+                    events.forEach(event => {
+                        document.removeEventListener(event, handleUserInteraction);
+                    });
+                };
+            }, [enableAudio, initAudio]);
+
+            // Audio context management for mobile compatibility
+            const audioContextRef = useRef(null);
+            const [audioEnabled, setAudioEnabled] = useState(false);
+
+            // Initialize audio context
+            const initAudio = useCallback(async () => {
+                if (!window.AudioContext && !window.webkitAudioContext) {
+                    console.log('Web Audio API not supported');
+                    return false;
+                }
+
+                try {
+                    if (!audioContextRef.current) {
+                        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+                    }
+
+                    // Resume audio context if suspended (required for mobile)
+                    if (audioContextRef.current.state === 'suspended') {
+                        await audioContextRef.current.resume();
+                    }
+
+                    setAudioEnabled(audioContextRef.current.state === 'running');
+                    return audioContextRef.current.state === 'running';
+                } catch (error) {
+                    console.log('Audio initialization failed:', error);
+                    return false;
+                }
+            }, []);
+
+            // Enable audio on first user interaction
+            const enableAudio = useCallback(async () => {
+                if (!audioEnabled) {
+                    const success = await initAudio();
+                    if (success) {
+                        console.log('Audio enabled');
+                    }
+                }
+            }, [audioEnabled, initAudio]);
+
+            // Play sound with mobile compatibility
+            const playSound = useCallback(async (frequency, duration, type = 'sine') => {
+                if (!audioContextRef.current) {
+                    await initAudio();
+                }
+
+                if (!audioContextRef.current || audioContextRef.current.state !== 'running') {
+                    return;
+                }
+
+                try {
+                    const oscillator = audioContextRef.current.createOscillator();
+                    const gainNode = audioContextRef.current.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContextRef.current.destination);
+                    
+                    oscillator.frequency.setValueAtTime(frequency, audioContextRef.current.currentTime);
+                    oscillator.type = type;
+                    
+                    gainNode.gain.setValueAtTime(0, audioContextRef.current.currentTime);
+                    gainNode.gain.linearRampToValueAtTime(0.2, audioContextRef.current.currentTime + 0.01);
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, audioContextRef.current.currentTime + duration);
+                    
+                    oscillator.start(audioContextRef.current.currentTime);
+                    oscillator.stop(audioContextRef.current.currentTime + duration);
+                } catch (error) {
+                    console.log('Sound playback failed:', error);
+                }
+            }, [initAudio]);
+
+            // Sound effects
+            const sounds = {
+                move: async () => await playSound(800, 0.1, 'square'),
+                win: async () => {
+                    await playSound(523, 0.2);
+                    setTimeout(() => playSound(659, 0.2), 200);
+                    setTimeout(() => playSound(784, 0.3), 400);
+                },
+                draw: async () => {
+                    await playSound(300, 0.3, 'sawtooth');
+                    setTimeout(() => playSound(250, 0.3, 'sawtooth'), 300);
+                },
+                reset: async () => await playSound(1000, 0.1, 'triangle')
+            };
+
+            // Check for winner
+            const checkWinner = useCallback((boardState) => {
+                for (let combination of WINNING_COMBINATIONS) {
+                    const [a, b, c] = combination;
+                    if (boardState[a] && boardState[a] === boardState[b] && boardState[a] === boardState[c]) {
+                        return { winner: boardState[a], line: combination };
+                    }
+                }
+                return null;
+            }, []);
+
+            // Handle cell click
+            const handleCellClick = async (index) => {
+                if (board[index] || gameStatus !== 'playing') return;
+
+                // Enable audio on first interaction (required for mobile)
+                await enableAudio();
+
+                const newBoard = [...board];
+                newBoard[index] = currentPlayer;
+                setBoard(newBoard);
+
+                const result = checkWinner(newBoard);
+                if (result) {
+                    setWinner(result.winner);
+                    setWinningLine(result.line);
+                    setGameStatus('won');
+                    setScores(prev => ({ ...prev, [result.winner]: prev[result.winner] + 1 }));
+                    sounds.win();
+                } else if (newBoard.every(cell => cell !== null)) {
+                    setGameStatus('draw');
+                    setScores(prev => ({ ...prev, draws: prev.draws + 1 }));
+                    sounds.draw();
+                } else {
+                    setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X');
+                    sounds.move();
+                }
+            };
+
+            // Reset game
+            const resetGame = async () => {
+                // Enable audio on interaction (required for mobile)
+                await enableAudio();
+                
+                setBoard(Array(9).fill(null));
+                setCurrentPlayer('X');
+                setGameStatus('playing');
+                setWinner(null);
+                setWinningLine([]);
+                sounds.reset();
+            };
+
+            // Reset scores
+            const resetScores = async () => {
+                // Enable audio on interaction (required for mobile)
+                await enableAudio();
+                
+                setScores({ X: 0, O: 0, draws: 0 });
+                sounds.reset();
+            };
+
+            // Get result text
+            const getResultText = () => {
+                if (gameStatus === 'won') {
+                    return `Player ${winner} Wins!`;
+                } else if (gameStatus === 'draw') {
+                    return "It's a Draw!";
+                } else {
+                    return `Player ${currentPlayer}'s Turn`;
+                }
+            };
+
+            // Get cell class
+            const getCellClass = (index) => {
+                let className = 'cell';
+                
+                if (board[index]) {
+                    className += ` filled ${board[index].toLowerCase()}`;
+                }
+                
+                if (winningLine.includes(index)) {
+                    className += ' winning';
+                }
+                
+                return className;
+            };
+
+            // Calculate statistics
+            const totalGames = scores.X + scores.O + scores.draws;
+            const xWinRate = totalGames > 0 ? Math.round((scores.X / totalGames) * 100) : 0;
+            const oWinRate = totalGames > 0 ? Math.round((scores.O / totalGames) * 100) : 0;
+
+            return (
+                <div className="game-container">
+                    <h1 className="game-title">TIC TAC TOE</h1>
+                    {audioEnabled && (
+                        <div style={{
+                            position: 'absolute',
+                            top: '10px',
+                            right: '10px',
+                            fontSize: '12px',
+                            color: '#00ff00',
+                            opacity: 0.7
+                        }}>
+                            🔊
+                        </div>
+                    )}
+                    
+                    <div className="result-text">
+                        <span className={`result ${gameStatus === 'won' ? 'winner' : gameStatus === 'draw' ? 'draw' : 'playing'}`}>
+                            {getResultText()}
+                        </span>
+                    </div>
+
+                    <div className="game-board">
+                        {board.map((cell, index) => (
+                            <div
+                                key={index}
+                                className={getCellClass(index)}
+                                onClick={() => handleCellClick(index)}
+                            >
+                                <span className="cell-content">{cell}</span>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="score-section">
+                        <div className="score-display" title="Hover to see detailed stats">
+                            <div className="score-item x-score">
+                                <span className="player-label">Player X</span>
+                                <span className="score-value">{scores.X}</span>
+                            </div>
+                            <div className="score-item draw-score">
+                                <span className="player-label">Draws</span>
+                                <span className="score-value">{scores.draws}</span>
+                            </div>
+                            <div className="score-item o-score">
+                                <span className="player-label">Player O</span>
+                                <span className="score-value">{scores.O}</span>
+                            </div>
+                            <div className="score-tooltip">
+                                <div>Total Games: {totalGames}</div>
+                                <div>X Win Rate: {xWinRate}%</div>
+                                <div>O Win Rate: {oWinRate}%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="button-container">
+                        <button className="game-button reset-button" onClick={resetGame}>
+                            New Game
+                        </button>
+                        <button className="game-button clear-button" onClick={resetScores}>
+                            Clear Scores
+                        </button>
+                        <button className="game-button exit-button" onClick={async () => {
+                            await enableAudio();
+                            window.location.href = '../game.html';
+                        }}>
+                            Exit
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        // Render the app
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<TicTacToe />);
+    </script>
+</body>
+</html>
