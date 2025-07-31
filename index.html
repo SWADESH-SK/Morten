@@ -71,77 +71,7 @@
     <div id="root"></div>
     
     <!-- Main React Component -->
-    <script type="text/babel">
-        const { useState, useEffect } = React;
-        
-        // Import the LandingPage component (inline for demo)
-        function LandingPage() {
-            const [isLoaded, setIsLoaded] = useState(false);
-
-            useEffect(() => {
-                // Hide loading indicator and show page
-                const timer = setTimeout(() => {
-                    setIsLoaded(true);
-                    document.getElementById('loading').style.display = 'none';
-                }, 1500);
-                return () => clearTimeout(timer);
-            }, []);
-
-            const handleStartClick = () => {
-                // Navigate to the game page
-                console.log('Starting game...');
-                window.location.href = 'game.html';
-            };
-
-            return (
-                <div className={`landing-page ${isLoaded ? 'loaded' : ''}`}>
-                    <div className="pixel-background">
-                        <div className="background-pattern"></div>
-                        
-                        {/* Game Title */}
-                        <header className="game-header">
-                            <h1 className="pixel-title">MORTEN GAMES</h1>
-                            <p className="pixel-subtitle">An Adventure Awaits</p>
-                        </header>
-
-                        {/* Decorative Elements */}
-                        <div className="pixel-decorations">
-                            <div className="pixel-tree pixel-tree-left"></div>
-                            <div className="pixel-tree pixel-tree-right"></div>
-                            <div className="pixel-rocks"></div>
-                        </div>
-
-                        {/* Main Start Button */}
-                        <div className="start-button-container">
-                            <button 
-                                className="pixel-start-button" 
-                                onClick={handleStartClick}
-                                aria-label="Start the pixel art adventure game"
-                            >
-                                <span className="button-text">START</span>
-                                <div className="button-glow"></div>
-                                <div className="button-particles">
-                                    <span className="particle"></span>
-                                    <span className="particle"></span>
-                                    <span className="particle"></span>
-                                    <span className="particle"></span>
-                                </div>
-                            </button>
-                            <p className="pixel-text-below-button">Press START to begin your journey</p>
-                        </div>
-
-                        {/* Footer */}
-                        <footer className="game-footer">
-                        </footer>
-                    </div>
-                </div>
-            );
-        }
-        
-        // Render the application
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<LandingPage />);
-    </script>
+    <script src="./main.js"></script>
     
     <!-- Load CSS after React component -->
     <link rel="stylesheet" href="./LandingPage.css">
