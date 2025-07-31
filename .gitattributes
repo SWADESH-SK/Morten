@@ -1,11 +1,2 @@
 # Auto detect text files and perform LF normalization
 * text=auto
-
-# Language classification overrides for GitHub
-*.jsx linguist-language=JavaScript
-*.css linguist-language=CSS
-*.html linguist-documentation=false
-*.md linguist-documentation
-*.png linguist-generated=true
-sample/ linguist-vendored
-png/ linguist-generated
